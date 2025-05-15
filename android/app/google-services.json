@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1051295033097",
+    "project_id": "closet-companion-clean",
+    "storage_bucket": "closet-companion-clean.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1051295033097:android:c15b4077fa7a6b842555d8",
+        "android_client_info": {
+          "package_name": "com.example.closet_companion_clean"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDDCbHvVlv--AWOC2MlCbXdTVFdpc_BRZ0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
