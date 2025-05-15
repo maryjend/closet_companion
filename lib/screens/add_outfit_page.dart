@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import '../../models/outfit.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+
+import '../../models/outfit.dart';
 
 class AddOutfitPage extends StatefulWidget {
   final Outfit? existingOutfit;
@@ -37,7 +40,7 @@ class _AddOutfitPageState extends State<AddOutfitPage> {
 
     if (widget.existingOutfit != null) {
       final outfit = widget.existingOutfit!;
-      _image = File(outfit.imagePath);
+      _image = File(outfit.imagePath); // still used for preview before upload
       notesController.text = outfit.notes;
       selectedCategory = outfit.category;
       selectedTags = List<String>.from(outfit.tags);
@@ -59,6 +62,13 @@ class _AddOutfitPageState extends State<AddOutfitPage> {
     await prefs.setStringList('all_tags', allTags);
   }
 
+  Future<File> saveImageLocally(XFile pickedFile) async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final savedImage = await File(pickedFile.path).copy('${appDir.path}/$fileName');
+    return savedImage;
+  }
+
   Future<void> pickImage() async {
     showModalBottomSheet(
       context: context,
@@ -73,8 +83,9 @@ class _AddOutfitPageState extends State<AddOutfitPage> {
                   Navigator.pop(context);
                   final pickedFile = await picker.pickImage(source: ImageSource.camera);
                   if (pickedFile != null) {
+                    final savedImage = await saveImageLocally(pickedFile);
                     setState(() {
-                      _image = File(pickedFile.path);
+                      _image = savedImage;
                     });
                   }
                 },
@@ -86,8 +97,9 @@ class _AddOutfitPageState extends State<AddOutfitPage> {
                   Navigator.pop(context);
                   final pickedFile = await picker.pickImage(source: ImageSource.gallery);
                   if (pickedFile != null) {
+                    final savedImage = await saveImageLocally(pickedFile);
                     setState(() {
-                      _image = File(pickedFile.path);
+                      _image = savedImage;
                     });
                   }
                 },
@@ -99,6 +111,14 @@ class _AddOutfitPageState extends State<AddOutfitPage> {
     );
   }
 
+  Future<String> uploadImageToFirebase(File imageFile) async {
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final ref = FirebaseStorage.instance.ref().child('outfit_images/$fileName');
+    final uploadTask = await ref.putFile(imageFile);
+    final downloadUrl = await uploadTask.ref.getDownloadURL();
+    return downloadUrl;
+  }
+
   Future<void> saveOutfit() async {
     if (_image == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -107,8 +127,10 @@ class _AddOutfitPageState extends State<AddOutfitPage> {
       return;
     }
 
+    final imageUrl = await uploadImageToFirebase(_image!);
+
     final newOutfit = Outfit(
-      imagePath: _image!.path,
+      imagePath: imageUrl,
       date: DateFormat('MMM d, y – h:mm a').format(DateTime.now()),
       category: selectedCategory ?? '',
       notes: notesController.text.trim(),
@@ -120,9 +142,9 @@ class _AddOutfitPageState extends State<AddOutfitPage> {
     List<dynamic> outfitList = existing != null ? jsonDecode(existing) : [];
 
     if (widget.outfitIndex != null) {
-      outfitList[widget.outfitIndex!] = newOutfit.toJson(); // EDIT mode
+      outfitList[widget.outfitIndex!] = newOutfit.toJson();
     } else {
-      outfitList.add(newOutfit.toJson()); // ADD mode
+      outfitList.add(newOutfit.toJson());
     }
 
     await prefs.setString('outfits', jsonEncode(outfitList));

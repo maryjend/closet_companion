@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -63,7 +62,12 @@ class OutfitDetailPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Image.file(File(outfit.imagePath), height: 250, fit: BoxFit.cover),
+            Image.network(
+              outfit.imagePath,
+              height: 250,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 100),
+            ),
             const SizedBox(height: 16),
             Text(
               "⭐ ${outfit.category}",

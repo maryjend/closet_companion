@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/outfit.dart';
 import 'outfit_detail_page.dart';
+import 'add_outfit_page.dart'; // ✅ NEW: for navigation
 
 class OutfitLogPage extends StatefulWidget {
   const OutfitLogPage({super.key});
@@ -158,10 +159,24 @@ class _OutfitLogPageState extends State<OutfitLogPage> {
       appBar: AppBar(
         title: const Text("⭐ Outfit Log"),
         backgroundColor: Colors.teal,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_alt),
+            onPressed: showFilterDialog,
+            tooltip: 'Filter & Sort',
+          )
+        ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: showFilterDialog,
-        child: const Icon(Icons.filter_alt),
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddOutfitPage()),
+          );
+          loadOutfits(); // reload after adding
+        },
+        child: const Icon(Icons.add),
+        tooltip: 'Add New Outfit',
       ),
       body: filteredOutfits.isEmpty
           ? const Center(
@@ -236,8 +251,7 @@ class _OutfitLogPageState extends State<OutfitLogPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              OutfitDetailPage(outfit: outfit),
+                          builder: (context) => OutfitDetailPage(outfit: outfit),
                         ),
                       ).then((_) => loadOutfits());
                     },
