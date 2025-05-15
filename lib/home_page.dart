@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/add_outfit_page.dart';
-import 'outfit_log_page.dart'; // 👈 Make sure this file exists
+import 'screens/outfit_log_page.dart'; /// file exists
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});

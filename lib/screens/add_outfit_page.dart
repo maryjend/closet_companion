@@ -7,7 +7,10 @@ import '../../models/outfit.dart';
 import 'package:intl/intl.dart';
 
 class AddOutfitPage extends StatefulWidget {
-  const AddOutfitPage({super.key});
+  final Outfit? existingOutfit;
+  final int? outfitIndex;
+
+  const AddOutfitPage({super.key, this.existingOutfit, this.outfitIndex});
 
   @override
   State<AddOutfitPage> createState() => _AddOutfitPageState();
@@ -17,12 +20,44 @@ class _AddOutfitPageState extends State<AddOutfitPage> {
   File? _image;
   final picker = ImagePicker();
 
-  final TextEditingController tagController = TextEditingController();
   final TextEditingController notesController = TextEditingController();
   final TextEditingController newCategoryController = TextEditingController();
+  final TextEditingController newTagController = TextEditingController();
 
   List<String> categories = ['athletic', 'professional', 'casual', 'warm', 'cold'];
   String? selectedCategory;
+
+  List<String> allTags = ['comfy', 'cute', 'fitness'];
+  List<String> selectedTags = [];
+
+  @override
+  void initState() {
+    super.initState();
+    loadSavedTags();
+
+    if (widget.existingOutfit != null) {
+      final outfit = widget.existingOutfit!;
+      _image = File(outfit.imagePath);
+      notesController.text = outfit.notes;
+      selectedCategory = outfit.category;
+      selectedTags = List<String>.from(outfit.tags);
+    }
+  }
+
+  Future<void> loadSavedTags() async {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String>? saved = prefs.getStringList('all_tags');
+    if (saved != null) {
+      setState(() {
+        allTags = saved;
+      });
+    }
+  }
+
+  Future<void> saveTags() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('all_tags', allTags);
+  }
 
   Future<void> pickImage() async {
     showModalBottomSheet(
@@ -64,16 +99,7 @@ class _AddOutfitPageState extends State<AddOutfitPage> {
     );
   }
 
-  Future<void> saveOutfitLocally(Outfit outfit) async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? existing = prefs.getString('outfits');
-    List<dynamic> outfitList = existing != null ? jsonDecode(existing) : [];
-
-    outfitList.add(outfit.toJson());
-    await prefs.setString('outfits', jsonEncode(outfitList));
-  }
-
-  void saveOutfit() {
+  Future<void> saveOutfit() async {
     if (_image == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please pick an image")),
@@ -81,25 +107,37 @@ class _AddOutfitPageState extends State<AddOutfitPage> {
       return;
     }
 
-    final outfit = Outfit(
+    final newOutfit = Outfit(
       imagePath: _image!.path,
       date: DateFormat('MMM d, y – h:mm a').format(DateTime.now()),
       category: selectedCategory ?? '',
       notes: notesController.text.trim(),
+      tags: selectedTags,
     );
 
-    saveOutfitLocally(outfit).then((_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Outfit saved locally!")),
-      );
-      Navigator.pop(context);
-    });
+    final prefs = await SharedPreferences.getInstance();
+    final String? existing = prefs.getString('outfits');
+    List<dynamic> outfitList = existing != null ? jsonDecode(existing) : [];
+
+    if (widget.outfitIndex != null) {
+      outfitList[widget.outfitIndex!] = newOutfit.toJson(); // EDIT mode
+    } else {
+      outfitList.add(newOutfit.toJson()); // ADD mode
+    }
+
+    await prefs.setString('outfits', jsonEncode(outfitList));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(widget.outfitIndex != null ? "Outfit updated!" : "Outfit saved!")),
+    );
+
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Add Outfit")),
+      appBar: AppBar(title: Text(widget.outfitIndex != null ? "Edit Outfit" : "Add Outfit")),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -108,11 +146,49 @@ class _AddOutfitPageState extends State<AddOutfitPage> {
                 ? Image.file(_image!, height: 200)
                 : const Text("No image selected"),
             ElevatedButton(onPressed: pickImage, child: const Text("Pick Image")),
-            TextField(
-              controller: tagController,
-              decoration: const InputDecoration(labelText: "Tags"),
-            ),
+
             const SizedBox(height: 12),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text("Tags", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            Wrap(
+              spacing: 8,
+              children: allTags.map((tag) {
+                final isSelected = selectedTags.contains(tag);
+                return FilterChip(
+                  label: Text('#$tag'),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      isSelected
+                          ? selectedTags.remove(tag)
+                          : selectedTags.add(tag);
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+            TextField(
+              controller: newTagController,
+              decoration: const InputDecoration(
+                labelText: 'Add New Tag',
+                suffixIcon: Icon(Icons.add),
+              ),
+              onSubmitted: (value) {
+                final newTag = value.trim();
+                if (newTag.isNotEmpty && !allTags.contains(newTag)) {
+                  setState(() {
+                    allTags.add(newTag);
+                    selectedTags.add(newTag);
+                    newTagController.clear();
+                  });
+                  saveTags();
+                }
+              },
+            ),
+
+            const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               decoration: const InputDecoration(labelText: "Category"),
               value: selectedCategory,
@@ -151,7 +227,10 @@ class _AddOutfitPageState extends State<AddOutfitPage> {
               decoration: const InputDecoration(labelText: "Notes"),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: saveOutfit, child: const Text("Save Outfit")),
+            ElevatedButton(
+              onPressed: saveOutfit,
+              child: Text(widget.outfitIndex != null ? "Update Outfit" : "Save Outfit"),
+            ),
           ],
         ),
       ),
